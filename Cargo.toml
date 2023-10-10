@@ -1,0 +1,13 @@
+[package]
+name = "wei-frp"
+version = "0.1.0"
+edition = "2021"
+description = "wei frp"
+documentation = "https://github.com/zuiyue-com/wei-frp"
+homepage = "https://github.com/zuiyue-com/wei-frp"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+wei-run = "0.2.4"
+wei-env = "0.2.12"
+wei-log = "0.2.5"
