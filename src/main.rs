@@ -26,7 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "start" => {
             info!("start");
-            wei_run::command_async("wsl", vec!["/root/data/frp/frpc", "-c", "/root/data/frp/frpc.ini"])?;
+            wei_run::command_async("wsl", vec![
+                "/root/data/frp/frpc", 
+                "-c", 
+                "/root/data/frp/frpc.ini"
+            ])?;
         },
         "status" => {
             info!("status");
