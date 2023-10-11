@@ -1,13 +1,17 @@
 [package]
-name = "wei-frp"
+name = "wei-forward"
 version = "0.1.0"
 edition = "2021"
-description = "wei frp"
-documentation = "https://github.com/zuiyue-com/wei-frp"
-homepage = "https://github.com/zuiyue-com/wei-frp"
+description = "wei forward"
+documentation = "https://github.com/zuiyue-com/wei-forward"
+homepage = "https://github.com/zuiyue-com/wei-forward"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
 wei-run = "0.2.4"
 wei-env = "0.2.12"
 wei-log = "0.2.5"
+ureq = "2.8.0"
+
+# reqwest = { version = "0.11", features = ["blocking"] }
+# single-instance = "0.3"
