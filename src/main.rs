@@ -3,11 +3,6 @@ extern crate wei_log;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     wei_env::bin_init("wei-updater");
-    // use single_instance::SingleInstance;
-    // let instance = SingleInstance::new("wei-updater").unwrap();
-    // if !instance.is_single() { 
-    //     std::process::exit(1);
-    // };
 
     info!("wei-forward start");
 
@@ -31,6 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "-c", 
                 "/root/data/frp/frpc.ini"
             ])?;
+
+            print!("{}", serde_json::json!({
+                "code": 200,
+                "message": "success"
+            }));
         },
         "status" => {
             info!("status");
