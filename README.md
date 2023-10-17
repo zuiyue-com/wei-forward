@@ -1,7 +1,11 @@
 # wei forward
 
 - [ ] 访问服务端获取可用 frp-server
+    - [ ] 服务端配置 http://download.zuiyue.com/forward.json
+    - [ ] 轮询配置服务端地址
 - [ ] 获取 wsl ip address
-- [ ] 启动和停止frp服务
+- [x] 启动和停止frp服务
 - [ ] 配置管理 frp 服务
-- [ ] 状态监控
+    - [ ] 开启端口
+    - [ ] 关闭端口
+- [x] 状态监控
