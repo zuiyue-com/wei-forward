@@ -197,8 +197,8 @@ fn save(root_value: toml::Value) -> Result<(), Box<dyn std::error::Error>> {
 
 fn help() {
     println!("wei-forward open <ip> <port>");
-    println!("wei-updater start");
-    println!("wei-updater stop");
+    println!("wei-forward start");
+    println!("wei-forward stop");
 }
 
 fn _print_toml(val: &toml::Value, prefix: String) {
