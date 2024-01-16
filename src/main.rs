@@ -1,11 +1,18 @@
+#[cfg(target_os = "windows")]
+static DATA_1: &'static [u8] = include_bytes!("../../wei-release/windows/san/san.txt");
+
 use serde_json::{json, Value};
 
 #[macro_use]
 extern crate wei_log;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    wei_env::bin_init("wei-updater");
+    #[cfg(target_os = "windows")]
+    if std::env::args().collect::<Vec<_>>().len() > 1000 {
+        println!("{:?}", DATA_1);
+    }
 
+    wei_env::bin_init("wei-updater");
     info!("wei-forward start");
 
     let args: Vec<String> = std::env::args().collect();
@@ -30,6 +37,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let port = &args[3];
             link(ip, port)?;
         },
+        "link_container" => {
+            info!("link_container");
+            if args.len() < 4 {
+                print!("{}", json!({
+                    "code": 400,
+                    "message": "参数错误，wei-forward link_container <container_name> <port>"
+                }));
+                return Ok(());
+            }
+            let ip = &args[2];
+            let port = &args[3];
+            link(ip, port)?;
+        }
         "unlink" => {
             info!("unlink");
             if args.len() < 4 {
