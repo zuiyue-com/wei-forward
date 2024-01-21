@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             result(link_container(&args[2], &args[3]));
         }
         "unlink" => {
-            result(unlink(&args[2], &args[3], &args[4]));
+            result(unlink(&args[2]));
         }
         "start" => {
             result(start());

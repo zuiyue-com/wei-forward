@@ -116,12 +116,12 @@ pub fn status() -> Result<Value, Box<dyn std::error::Error>> {
     Ok(body_value)
 }
 
-pub fn unlink(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let root_string: String = ureq::get("http://localhost:7400/api/config").call()?.into_string()?;
 
     let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
 
-    let remove_table = format!("link-{}-{}-{}", &name, &ip.replace(".", "_"), port);
+    let remove_table = format!("{}", &name);
     root_value.as_table_mut().unwrap().remove(&remove_table);
 
     save(root_value)?;
