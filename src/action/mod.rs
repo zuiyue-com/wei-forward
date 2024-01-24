@@ -2,13 +2,13 @@ use serde_json::Value;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
     // 判断 wsl ls /frpc.toml 是否存在，如果不存在，则创建
-    let output = wei_run::command("wsl", vec!["ls", "/frpc.toml"])?;
+    let output = wei_run::command("wei-wsl", vec!["ls", "/frpc.toml"])?;
 
     if output.contains("No such file or directory") {
         write_conf(&conf())?;
     }
 
-    wei_run::command_async("wsl", vec![
+    wei_run::command_async("wei-wsl", vec![
         "/usr/bin/frpc", 
         "-c", 
         "/frpc.toml"
@@ -21,7 +21,7 @@ pub fn write_conf(data: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_name = format!("./frpc.toml");
     std::fs::write(file_name.as_str(), data)?;
 
-    wei_run::command("wsl", vec!["mv", "./frpc.toml", "/frpc.toml"])?;
+    wei_run::command("wei-wsl", vec!["mv", "./frpc.toml", "/frpc.toml"])?;
 
     // 删除本地文件
     match std::fs::remove_file(file_name.as_str()) {

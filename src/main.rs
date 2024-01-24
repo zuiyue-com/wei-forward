@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "stop" => {
             info!("stop");
-            result(wei_run::command_async("wsl", vec![
+            result(wei_run::command_async("wei-wsl", vec![
                 "/usr/bin/killall", 
                 "frpc"
             ]));
