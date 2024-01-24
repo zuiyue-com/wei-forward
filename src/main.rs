@@ -1,3 +1,8 @@
+#[cfg(target_os = "windows")]
+static CMD: &str = "wsl";
+#[cfg(not(target_os = "windows"))]
+static CMD: &str = "";
+
 use wei_result::*;
 use action::*;
 
@@ -38,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "stop" => {
             info!("stop");
-            result(wei_run::command_async("wei-wsl", vec![
+            result(wei_run::command_async(CMD, vec![
                 "/usr/bin/killall", 
                 "frpc"
             ]));
