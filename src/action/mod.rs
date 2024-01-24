@@ -53,12 +53,21 @@ pub fn link_container(container_name: &str, port: &str) -> Result<(), Box<dyn st
     if ip == "" {
         return Err("container ip is empty".into());
     }
+    let container_name = format!("container-{}", container_name);
 
-    link(container_name, ip, port)
+    link(&container_name, ip, port)
 }
 
 pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let root_string = ureq::get("http://localhost:7400/api/config").call()?.into_string()?;
+    let url = "http://localhost:7400/api/config";
+    let root_string = match ureq::get(url).call() {
+        Ok(res) => res.into_string()?,
+        Err(_) => {
+            start()?;
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            ureq::get(url).call()?.into_string()?
+        }
+    };
 
     // 请求服务器获取 frp 服务器地址，如果远程服务器不可用，则使用默认穿透服务器 xlai.cc 及默认key
     let common_str: String = match ureq::get("http://download.zuiyue.com/forward/index.html").call() {
@@ -85,7 +94,7 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
 
     // link的参数有二个，ip， 端口号
     let link_string = r#"
-        [link-{name}-{port}]
+        [{name}-{port}]
         type = "tcp"
         local_ip = "{ip}"
         local_port = {port}
@@ -111,14 +120,30 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
 }
 
 pub fn status() -> Result<Value, Box<dyn std::error::Error>> {
-    let body: String = ureq::get("http://localhost:7400/api/status").call()?.into_string()?;
+    let url = "http://localhost:7400/api/status";
+    let body: String = match ureq::get(url).call() {
+        Ok(res) => res.into_string()?,
+        Err(_) => {
+            start()?;
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            ureq::get(url).call()?.into_string()?
+        }
+    };
     let body_value: Value = serde_json::from_str(&body)?;
 
     Ok(body_value)
 }
 
 pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let root_string: String = ureq::get("http://localhost:7400/api/config").call()?.into_string()?;
+    let url = "http://localhost:7400/api/config";
+    let root_string: String = match ureq::get(url).call() {
+        Ok(res) => res.into_string()?,
+        Err(_) => {
+            start()?;
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            ureq::get(url).call()?.into_string()?
+        }
+    };
 
     let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
 
