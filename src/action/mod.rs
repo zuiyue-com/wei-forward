@@ -85,13 +85,13 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
 
     // link的参数有二个，ip， 端口号
     let link_string = r#"
-        [link-{name}-{ip_name}-{port}]
+        [link-{name}-{port}]
         type = "tcp"
         local_ip = "{ip}"
         local_port = {port}
         remote_port = 0
     "#.replace("{name}", name)
-    .replace("{ip_name}", &ip.replace(".", "_"))
+    // .replace("{ip_name}", &ip.replace(".", "_"))
     .replace("{ip}", ip)
     .replace("{port}", port);
   
