@@ -46,9 +46,13 @@ admin_port = 7400
 }
 
 pub fn link_container(container_name: &str, port: &str) -> Result<(), Box<dyn std::error::Error>> {
+    info!("link_container");
     let data = wei_run::run("wei-docker", vec!["container_ip", container_name])?;
+    info!("data: {}", data);
     let data: serde_json::Value = serde_json::from_str(&data)?;
+    info!("data: {:?}", data);
     let ip = data["data"].as_str().ok_or("")?;
+    info!("ip: {}", ip);
 
     if ip == "" {
         return Err("container ip is empty".into());
@@ -59,30 +63,38 @@ pub fn link_container(container_name: &str, port: &str) -> Result<(), Box<dyn st
 }
 
 pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::Error>> {
+    info!("link");
     let url = "http://localhost:7400/api/config";
+    info!("frp url: {}", url);
     let root_string = match ureq::get(url).call() {
         Ok(res) => res.into_string()?,
-        Err(_) => {
+        Err(e) => {
+            info!("connect frp api error: {:?}", e);
             start()?;
             std::thread::sleep(std::time::Duration::from_secs(10));
             ureq::get(url).call()?.into_string()?
         }
     };
 
+    info!("获取远程 frp 服务器地址")
     // 请求服务器获取 frp 服务器地址，如果远程服务器不可用，则使用默认穿透服务器 xlai.cc 及默认key
     let common_str: String = match ureq::get("http://download.zuiyue.com/forward/index.html").call() {
         Ok(res) => res.into_string()?,
         Err(_) => conf()
     };
 
+    info!("common_str: {}", common_str);
     let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
 
+    info!("remove common node");
     // 删除 common 节点
     root_value.as_table_mut().unwrap().remove("common");
 
+    info!("parse common_str");
     // 解析服务器的 common_str 为 toml::Value
     let common_value: toml::Value = toml::from_str(&common_str).unwrap();
 
+    info!("将 common_value 中的每个元素加入到 root_value: {:?}", root_value);
     // 将 common_value 中的每个元素加入到 root_value 中
     if let Some(root_table) = root_value.as_table_mut() {
         if let Some(common_table) = common_value.as_table() {
@@ -104,8 +116,10 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
     .replace("{ip}", ip)
     .replace("{port}", port);
   
+    info!("link_string: {}", link_string);
     let link_value: toml::Value = toml::from_str(&link_string).unwrap();
 
+    info!("将 link_value 中的每个元素加入到 root_value: {:?}", root_value);
     // 将 link_value 中的每个元素加入到 root_value 中
     if let Some(root_table) = root_value.as_table_mut() {
         if let Some(link_table) = link_value.as_table() {
@@ -115,6 +129,7 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
         }
     }
     
+    info!("save");
     save(root_value)?;
     Ok(())
 }
