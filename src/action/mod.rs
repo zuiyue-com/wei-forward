@@ -76,7 +76,7 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
         }
     };
 
-    info!("获取远程 frp 服务器地址")
+    info!("获取远程 frp 服务器地址");
     // 请求服务器获取 frp 服务器地址，如果远程服务器不可用，则使用默认穿透服务器 xlai.cc 及默认key
     let common_str: String = match ureq::get("http://download.zuiyue.com/forward/index.html").call() {
         Ok(res) => res.into_string()?,
