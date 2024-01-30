@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match command {
         "link" => {
             result(link(&args[2], &args[3], &args[4]));
-        },
+        }
         "link_container" => {
             result(link_container(&args[2], &args[3]));
         }
@@ -37,19 +37,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "start" => {
             result(start());
-        },
+        }
         "status" => {
             result_value(status());
-        },
+        }
+        "manager" => {
+            result(manager());
+        }
         "stop" => {
             info!("stop");
             result(wei_run::command_async(CMD, vec![
                 "/usr/bin/killall", 
                 "frpc"
             ]));
-        },
+        }
         _ => {
-            help();
+            result(start());
         }
     }
 
