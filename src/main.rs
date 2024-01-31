@@ -27,10 +27,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match command {
         "link" => {
-            result(link(&args[2], &args[3], &args[4]));
+            result(link(&args[2], &args[3], &args[4], &args[5]));
         }
         "link_container" => {
-            result(link_container(&args[2], &args[3]));
+            result(link_container(&args[2], &args[3], &args[4]));
         }
         "unlink" => {
             result(unlink(&args[2]));

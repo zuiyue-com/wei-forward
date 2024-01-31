@@ -1,6 +1,6 @@
 use crate::CMD;
 use serde_json::Value;
-use wei_result::*;
+// use wei_result::*;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
     // 判断 wsl ls /frpc.toml 是否存在，如果不存在，则创建
@@ -10,7 +10,7 @@ pub fn start() -> Result<(), Box<dyn std::error::Error>> {
         write_conf(&conf())?;
     }
 
-    wei_run::command_async(CMD, vec![
+    wei_run::command(CMD, vec![
         "/usr/bin/frpc", 
         "-c", 
         "/frpc.toml"
@@ -68,7 +68,12 @@ pub fn manager() -> Result<(), Box<dyn std::error::Error>> {
                 let local_ip = i["local_ip"].as_str().ok_or("")?;
                 if local_ip != ip {
                     // unlink(&name)?;
-                    link(&name, ip, i["local_port"].as_str().ok_or("")?)?;
+                    link(
+                        &name, 
+                        ip, 
+                        i["local_port"].as_str().ok_or("")?,
+                        i["remote_port"].as_str().ok_or("")?
+                    )?;
                 }
             }
         }
@@ -77,7 +82,7 @@ pub fn manager() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn link_container(container_name: &str, port: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn link_container(container_name: &str, port: &str, remote_port: &str) -> Result<(), Box<dyn std::error::Error>> {
     info!("link_container: {}, {}", container_name, port);
     let data = wei_run::run("wei-docker", vec!["container_ip", container_name])?;
     let data: serde_json::Value = serde_json::from_str(&data)?;
@@ -88,20 +93,11 @@ pub fn link_container(container_name: &str, port: &str) -> Result<(), Box<dyn st
     }
     let container_name = format!("container-{}", container_name);
 
-    link(&container_name, ip, port)
+    link(&container_name, ip, port, remote_port)
 }
 
-pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::Error>> {
-    info!("link: {}, {}, {}", name, ip, port);
-    let url = "http://localhost:7400/api/config";
-
-    let root_string = match reqwest::blocking::get(url) {
-        Ok(res) => res.text()?,
-        Err(e) => {
-            error(format!("connect frp api error: {}", e));
-            std::process::exit(0);
-        }
-    };
+pub fn link(name: &str, ip: &str, port: &str, remote_port: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let root_string = read_conf()?;
 
     // 请求服务器获取 frp 服务器地址，如果远程服务器不可用，则使用默认穿透服务器 xlai.cc 及默认key
     let common_str: String = match reqwest::blocking::get("http://download.zuiyue.com/forward/index.html") {
@@ -128,15 +124,16 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
 
     // link的参数有二个，ip， 端口号
     let link_string = r#"
-        [{name}-{port}]
+        [{name}-{port}-{time}]
         type = "tcp"
         local_ip = "{ip}"
         local_port = {port}
-        remote_port = 0
+        remote_port = {remote_port}
     "#.replace("{name}", name)
-    // .replace("{ip_name}", &ip.replace(".", "_"))
     .replace("{ip}", ip)
-    .replace("{port}", port);
+    .replace("{port}", port)
+    .replace("{remote_port}", remote_port)
+    .replace("{time}", &format!("{}", chrono::Local::now().timestamp()));
   
     let link_value: toml::Value = toml::from_str(&link_string).unwrap();
 
@@ -149,37 +146,23 @@ pub fn link(name: &str, ip: &str, port: &str) -> Result<(), Box<dyn std::error::
         }
     }
     
-    info!("save");
     save(root_value)?;
     info!("save finish");
     Ok(())
 }
 
 pub fn status() -> Result<Value, Box<dyn std::error::Error>> {
-    let url = "http://localhost:7400/api/status";
-    let body: String = match reqwest::blocking::get(url) {
-        Ok(res) => res.text()?,
-        Err(e) => {
-            error(format!("connect frp api error: {}", e));
-            std::process::exit(0);
-        }
-    };
 
-    let body_value: Value = serde_json::from_str(&body)?;
+    let toml_str = read_conf()?;
+    let value: std::collections::BTreeMap<String, toml::Value> = toml::from_str(&toml_str)?;
+    let json_str = serde_json::to_string(&value)?;
+    let json_str: serde_json::Value = serde_json::from_str(&json_str)?;
 
-    Ok(body_value)
+    Ok(json_str)
 }
 
 pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let url = "http://localhost:7400/api/config";
-
-    let root_string: String = match reqwest::blocking::get(url) {
-        Ok(res) => res.text()?,
-        Err(e) => {
-            error(format!("connect frp api error: {}", e));
-            std::process::exit(0);
-        }
-    };
+    let root_string = read_conf()?;
 
     let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
 
@@ -190,21 +173,29 @@ pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+pub fn read_conf() -> Result<String, Box<dyn std::error::Error>> {
+    let mut root_string = wei_run::command(CMD, vec!["cat", "/frpc.toml"])?;
+
+    if root_string.contains("No such file or directory") {
+        root_string = conf();
+    }
+
+    Ok(root_string)
+}
+
 pub fn save(root_value: toml::Value) -> Result<(), Box<dyn std::error::Error>> {
     // 将 root_value 转换为 toml 字符串, 并put http://localhost:7400/api/config
     let root_string = toml::to_string(&root_value)?;
-
-    info!("put");
-    reqwest::blocking::Client::new()
-        .put("http://localhost:7400/api/config")
-        .body(root_string)
-        .send()?;
+    write_conf(&root_string)?;
 
     info!("reload");
-    reqwest::blocking::Client::new()
-        .get("http://localhost:7400/api/reload")
-        .send()?;
-
+    wei_run::command(CMD, vec![
+        "frpc", 
+        "reload",
+        "-c",
+        "/frpc.toml"
+    ])?;
+ 
     info!("reload finish");
     Ok(())
 }
