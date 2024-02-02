@@ -14,6 +14,7 @@ wei-env = "0.2.13"
 wei-log = "0.2.10"
 wei-result = "0.1"
 wei-windows = { path = "../wei-windows" }
+wei-api ={ path = "../wei-api" }
 serde_json = "1"
 ureq = "2.8.0"
 toml = "0.8.2"

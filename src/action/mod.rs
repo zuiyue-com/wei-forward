@@ -53,31 +53,27 @@ pub fn manager() -> Result<(), Box<dyn std::error::Error>> {
     // 如果 frp 列表中的 容器 不存在 docker 列表中，则删除 frp 列表中的配置
     // 扫描 frp 列表中的 container- 开头的配置，再去 wei-docker ip container_name 获取 ip，如果 ip 有变动，则更新 frp 配置
 
-    let data = status()?;
-    
-    let forward_list = data["tcp"].as_array().ok_or("")?;
+    let data = read_conf()?;
 
-    for i in forward_list {
-        let name = i["name"].as_str().ok_or("")?;
-        if name.starts_with("container-") {
-            let container_name = name.split("-").collect::<Vec<&str>>()[1];
+    let root_value: toml::Value = toml::from_str(&data).expect("Failed to parse the file");
+
+    for (key,value) in root_value.as_table().unwrap() {
+        if key.starts_with("container-") {
+            let container_name = key.split("-").collect::<Vec<&str>>()[1];
             let container_data = wei_run::run("wei-docker", vec!["container_ip", &container_name])?;
             let container_data: serde_json::Value = serde_json::from_str(&container_data)?;
             let ip = container_data["data"].as_str().ok_or("")?;
             if ip != "" {
-                let local_ip = i["local_ip"].as_str().ok_or("")?;
+                let local_ip = value["local_ip"].as_str().ok_or("")?;
+                let local_port = format!("{}", value["local_port"]);
+                let remote_port = format!("{}", value["remote_port"]);
                 if local_ip != ip {
-                    // unlink(&name)?;
-                    link(
-                        &name, 
-                        ip, 
-                        i["local_port"].as_str().ok_or("")?,
-                        i["remote_port"].as_str().ok_or("")?
-                    )?;
+                    link_container(&container_name, &local_port, &remote_port)?;
                 }
             }
         }
     }
+
 
     Ok(())
 }
@@ -97,6 +93,7 @@ pub fn link_container(container_name: &str, port: &str, remote_port: &str) -> Re
 }
 
 pub fn link(name: &str, ip: &str, port: &str, remote_port: &str) -> Result<(), Box<dyn std::error::Error>> {
+    info!("link: {}, {}, {}, {}", name, ip, port, remote_port);
     let root_string = read_conf()?;
 
     // 请求服务器获取 frp 服务器地址，如果远程服务器不可用，则使用默认穿透服务器 xlai.cc 及默认key
@@ -124,7 +121,7 @@ pub fn link(name: &str, ip: &str, port: &str, remote_port: &str) -> Result<(), B
 
     // link的参数有二个，ip， 端口号
     let link_string = r#"
-        [{name}-{port}-{time}]
+        [{name}-{port}-{uuid}]
         type = "tcp"
         local_ip = "{ip}"
         local_port = {port}
@@ -133,7 +130,7 @@ pub fn link(name: &str, ip: &str, port: &str, remote_port: &str) -> Result<(), B
     .replace("{ip}", ip)
     .replace("{port}", port)
     .replace("{remote_port}", remote_port)
-    .replace("{time}", &format!("{}", chrono::Local::now().timestamp()));
+    .replace("{uuid}", &wei_api::uuid());
   
     let link_value: toml::Value = toml::from_str(&link_string).unwrap();
 
@@ -166,8 +163,23 @@ pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
 
-    let remove_table = format!("{}", &name);
-    root_value.as_table_mut().unwrap().remove(&remove_table);
+    // 循环列出节点的名字，查找name符合包含的节点，删除
+    let name = name.to_string();
+    let mut keys_to_remove = Vec::new();
+
+    for key in root_value.as_table().unwrap().keys() {
+        if key.contains(&name) {
+            keys_to_remove.push(key.clone());
+        }
+    }
+
+    let root_table = root_value.as_table_mut().unwrap();
+    for key in keys_to_remove {
+        root_table.remove(&key);
+    }
+
+    // let remove_table = format!("{}", &name);
+    // root_value.as_table_mut().unwrap().remove(&remove_table);
 
     save(root_value)?;
     Ok(())
