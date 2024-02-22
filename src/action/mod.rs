@@ -1,5 +1,5 @@
 use crate::CMD;
-use serde_json::Value;
+// use serde_json::Value;
 // use wei_result::*;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,6 +34,22 @@ pub fn write_conf(data: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+pub fn write_link_conf(file_name: &str, data: &str) -> Result<(), Box<dyn std::error::Error>> {
+    info!("write_link_conf: {}", file_name);
+
+    std::fs::write(file_name, data)?;
+
+    wei_run::command(CMD, vec!["mkdir", "-p", "/frpc/"])?;
+    wei_run::command(CMD, vec!["mv", file_name, "/frpc/"])?;
+
+    match std::fs::remove_file(file_name) {
+        Ok(_) => {},
+        Err(_) => {}
+    };
+
+    Ok(())
+}
+
 pub fn conf() -> String {
 r#"
 [common] 
@@ -43,19 +59,19 @@ server_port = 7000
 protocol = "kcp"
 admin_addr = "0.0.0.0" 
 admin_port = 7400
+
+includes = "/frpc/*.toml"
 "#.to_string()
 }
 
-pub fn manager() -> Result<(), Box<dyn std::error::Error>> {
+pub fn manager_one_file(data: &str) -> Result<(), Box<dyn std::error::Error>> {
     // 获取 frp 列表
     // 列出 container- 开头的
     // 列出 wei-docker container 列表
     // 如果 frp 列表中的 容器 不存在 docker 列表中，则删除 frp 列表中的配置
     // 扫描 frp 列表中的 container- 开头的配置，再去 wei-docker ip container_name 获取 ip，如果 ip 有变动，则更新 frp 配置
 
-    let data = read_conf()?;
-
-    let root_value: toml::Value = toml::from_str(&data).expect("Failed to parse the file");
+    let root_value: toml::Value = toml::from_str(data).expect("Failed to parse the file");
 
     for (key,value) in root_value.as_table().unwrap() {
         if key.starts_with("container-") {
@@ -78,6 +94,21 @@ pub fn manager() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+pub fn manager() -> Result<(), Box<dyn std::error::Error>> {
+    let output = wei_run::command(CMD, vec!["ls", "/frpc"])?;
+    let output = output.split("\n").collect::<Vec<&str>>();
+
+    for file in output {
+        if file != "" {
+            let file_path = format!("/frpc/{}", file);
+            let data = wei_run::command(CMD, vec!["cat", &file_path])?;
+            manager_one_file(&data)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub fn link_container(container_name: &str, port: &str, remote_port: &str) -> Result<(), Box<dyn std::error::Error>> {
     info!("link_container: {}, {}", container_name, port);
     let data = wei_run::run("wei-docker", vec!["container_ip", container_name])?;
@@ -94,44 +125,36 @@ pub fn link_container(container_name: &str, port: &str, remote_port: &str) -> Re
 
 pub fn link(name: &str, ip: &str, port: &str, remote_port: &str) -> Result<(), Box<dyn std::error::Error>> {
     info!("link: {}, {}, {}, {}", name, ip, port, remote_port);
-    let root_string = read_conf()?;
+    // let root_string = read_conf()?;
 
     // 请求服务器获取 frp 服务器地址，如果远程服务器不可用，则使用默认穿透服务器 xlai.cc 及默认key
-    let common_str: String = match reqwest::blocking::get("http://download.zuiyue.com/forward/index.html") {
-        Ok(res) => res.text()?,
-        Err(_) => conf()
+    // let common_str: String = match reqwest::blocking::get("http://download.zuiyue.com/forward/index.html") {
+    //     Ok(res) => res.text()?,
+    //     Err(_) => conf()
+    // };
+
+    let file_name = format!("{}.toml", name);
+    let file_path = format!("/frpc/{}", file_name);
+    let root_string = wei_run::command(CMD, vec!["cat", &file_path])?;
+
+    let mut root_value: toml::Value = match toml::from_str(&root_string) {
+        Ok(v) => v,
+        Err(_) => toml::Value::Table(toml::value::Table::new()),
     };
-
-    let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
-
-    // 删除 common 节点
-    root_value.as_table_mut().unwrap().remove("common");
-
-    // 解析服务器的 common_str 为 toml::Value
-    let common_value: toml::Value = toml::from_str(&common_str).unwrap();
-
-    // 将 common_value 中的每个元素加入到 root_value 中
-    if let Some(root_table) = root_value.as_table_mut() {
-        if let Some(common_table) = common_value.as_table() {
-            for (key, value) in common_table {
-                root_table.insert(key.clone(), value.clone());
-            }
-        }
-    }
 
     // link的参数有二个，ip， 端口号
     let link_string = r#"
-        [{name}-{port}-{uuid}]
-        type = "tcp"
-        local_ip = "{ip}"
-        local_port = {port}
-        remote_port = {remote_port}
-    "#.replace("{name}", name)
+[{name}-{port}-{remote_port}-{uuid}]
+type = "tcp"
+local_ip = "{ip}"
+local_port = {port}
+remote_port = {remote_port}
+"#.replace("{name}", name)
     .replace("{ip}", ip)
     .replace("{port}", port)
     .replace("{remote_port}", remote_port)
     .replace("{uuid}", &wei_api::uuid());
-  
+
     let link_value: toml::Value = toml::from_str(&link_string).unwrap();
 
     // 将 link_value 中的每个元素加入到 root_value 中
@@ -142,64 +165,49 @@ pub fn link(name: &str, ip: &str, port: &str, remote_port: &str) -> Result<(), B
             }
         }
     }
+
+    let root_string = toml::to_string(&root_value).unwrap();
     
-    save(root_value)?;
+    write_link_conf(&file_name, &root_string)?;
+    reload()?;
+
     info!("save finish");
     Ok(())
 }
 
-pub fn status() -> Result<Value, Box<dyn std::error::Error>> {
+pub fn status() -> Result<String, Box<dyn std::error::Error>> {
+    let url = "http://localhost:7400/api/status";
 
-    let toml_str = read_conf()?;
-    let value: std::collections::BTreeMap<String, toml::Value> = toml::from_str(&toml_str)?;
-    let json_str = serde_json::to_string(&value)?;
-    let json_str: serde_json::Value = serde_json::from_str(&json_str)?;
+    let data = ureq::get(url).call()?.into_string()?;
 
-    Ok(json_str)
+    Ok(data)
 }
 
 pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let root_string = read_conf()?;
+    let output = wei_run::command(CMD, vec!["ls", "/frpc"])?;
+    let output = output.split("\n").collect::<Vec<&str>>();
 
-    let mut root_value: toml::Value = toml::from_str(&root_string).expect("Failed to parse the file");
-
-    // 循环列出节点的名字，查找name符合包含的节点，删除
-    let name = name.to_string();
-    let mut keys_to_remove = Vec::new();
-
-    for key in root_value.as_table().unwrap().keys() {
-        if key.contains(&name) {
-            keys_to_remove.push(key.clone());
+    for file in output {
+        if file.starts_with(name) {
+            let file_path = format!("/frpc/{}", file);
+            wei_run::command(CMD, vec!["rm", &file_path])?;
         }
     }
 
-    let root_table = root_value.as_table_mut().unwrap();
-    for key in keys_to_remove {
-        root_table.remove(&key);
-    }
-
-    // let remove_table = format!("{}", &name);
-    // root_value.as_table_mut().unwrap().remove(&remove_table);
-
-    save(root_value)?;
     Ok(())
 }
 
-pub fn read_conf() -> Result<String, Box<dyn std::error::Error>> {
-    let mut root_string = wei_run::command(CMD, vec!["cat", "/frpc.toml"])?;
+// pub fn read_conf() -> Result<String, Box<dyn std::error::Error>> {
+//     let mut root_string = wei_run::command(CMD, vec!["cat", "/frpc.toml"])?;
 
-    if root_string.contains("No such file or directory") {
-        root_string = conf();
-    }
+//     if root_string.contains("No such file or directory") {
+//         root_string = conf();
+//     }
 
-    Ok(root_string)
-}
+//     Ok(root_string)
+// }
 
-pub fn save(root_value: toml::Value) -> Result<(), Box<dyn std::error::Error>> {
-    // 将 root_value 转换为 toml 字符串, 并put http://localhost:7400/api/config
-    let root_string = toml::to_string(&root_value)?;
-    write_conf(&root_string)?;
-
+pub fn reload() -> Result<(), Box<dyn std::error::Error>> {
     info!("reload");
     wei_run::command(CMD, vec![
         "frpc", 

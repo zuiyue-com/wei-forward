@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             result(start());
         }
         "status" => {
-            result_value(status());
+            result_string(status());
         }
         "manager" => {
             result(manager());
