@@ -1,17 +1,27 @@
 use crate::CMD;
+use crate::FRP;
 // use serde_json::Value;
 // use wei_result::*;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {
     // 判断 wsl ls /frpc.toml 是否存在，如果不存在，则创建
-    let output = wei_run::command(CMD, vec!["ls", "/frpc.toml"])?;
+    
+    // match wei_run::command(CMD, vec!["ls", "/frpc.toml"]) {
+    //     Ok(_) => {},
+    //     Err(_) => {
+    //         write_conf(&conf())?;
+    //     }
+    // };
 
-    if output.contains("No such file or directory") {
-        write_conf(&conf())?;
-    }
+    write_conf(&conf())?;
+
+    wei_run::command(CMD, vec!["mkdir", "-p", "/frpc/"])?;
+
+    #[cfg(not(target_os = "windows"))]
+    wei_run::command(CMD, vec!["killall", "frpc"])?;
 
     wei_run::command(CMD, vec![
-        "/usr/bin/frpc", 
+        FRP, 
         "-c", 
         "/frpc.toml"
     ])?;
@@ -23,7 +33,10 @@ pub fn write_conf(data: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_name = format!("./frpc.toml");
     std::fs::write(file_name.as_str(), data)?;
 
-    wei_run::command(CMD, vec!["mv", "./frpc.toml", "/frpc.toml"])?;
+    match wei_run::command(CMD, vec!["mv", "./frpc.toml", "/frpc.toml"]) {
+        Ok(_) => {},
+        Err(_) => {}
+    };
 
     // 删除本地文件
     match std::fs::remove_file(file_name.as_str()) {
@@ -210,7 +223,7 @@ pub fn unlink(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 pub fn reload() -> Result<(), Box<dyn std::error::Error>> {
     info!("reload");
     wei_run::command(CMD, vec![
-        "frpc", 
+        FRP, 
         "reload",
         "-c",
         "/frpc.toml"

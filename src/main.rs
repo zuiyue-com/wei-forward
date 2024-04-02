@@ -1,7 +1,12 @@
 #[cfg(target_os = "windows")]
 static CMD: &str = "wsl";
+#[cfg(target_os = "windows")]
+static FRP: &str = "frpc";
+
 #[cfg(not(target_os = "windows"))]
-static CMD: &str = "";
+static CMD: &str = "sudo";
+#[cfg(not(target_os = "windows"))]
+static FRP: &str = "./frpc";
 
 use wei_result::*;
 use action::*;
