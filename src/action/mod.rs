@@ -71,7 +71,7 @@ server_addr = "xlai.cc"
 server_port = 7000
 protocol = "kcp"
 admin_addr = "0.0.0.0" 
-admin_port = 7400
+admin_port = 7401
 
 includes = "/frpc/*.toml"
 "#.to_string()
@@ -189,7 +189,7 @@ remote_port = {remote_port}
 }
 
 pub fn status() -> Result<String, Box<dyn std::error::Error>> {
-    let url = "http://localhost:7400/api/status";
+    let url = "http://localhost:7401/api/status";
 
     let data = ureq::get(url).call()?.into_string()?;
 
