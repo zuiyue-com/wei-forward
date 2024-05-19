@@ -64,14 +64,14 @@ pub fn write_link_conf(file_name: &str, data: &str) -> Result<(), Box<dyn std::e
 }
 
 pub fn conf() -> String {
-r#"
-[common] 
+r#"[common] 
 token = "D487DD0B55DFCACDD920CCBDAEAFA351"
 server_addr = "xlai.cc" 
 server_port = 7000
 protocol = "kcp"
 admin_addr = "0.0.0.0" 
 admin_port = 7401
+log_file = "/tmp/frpc.log"
 
 includes = "/frpc/*.toml"
 "#.to_string()
